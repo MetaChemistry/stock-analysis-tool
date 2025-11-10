@@ -564,7 +564,7 @@ def main():
 
     # Section 1: Valuation Metrics
     with st.sidebar.expander("💰 Valuation Metrics"):
-        col1, col2 = st.sidebar.columns(2)
+        col1, col2 = st.columns(2)
 
         with col1:
             pe_ratio = full_stock_info.get('trailingPE')
@@ -624,7 +624,7 @@ def main():
 
     # Section 2: Profitability
     with st.sidebar.expander("📈 Profitability"):
-        col1, col2 = st.sidebar.columns(2)
+        col1, col2 = st.columns(2)
 
         with col1:
             profit_margin = full_stock_info.get('profitMargins')
@@ -668,7 +668,7 @@ def main():
 
     # Section 3: Financial Health
     with st.sidebar.expander("🏦 Financial Health"):
-        col1, col2 = st.sidebar.columns(2)
+        col1, col2 = st.columns(2)
 
         with col1:
             debt_to_equity = full_stock_info.get('debtToEquity')
@@ -715,7 +715,7 @@ def main():
 
     # Section 4: Shareholder Returns
     with st.sidebar.expander("💵 Shareholder Returns"):
-        col1, col2 = st.sidebar.columns(2)
+        col1, col2 = st.columns(2)
 
         with col1:
             div_yield = full_stock_info.get('dividendYield')
@@ -754,7 +754,7 @@ def main():
 
     # Section 5: Performance vs Market
     with st.sidebar.expander("📊 Performance vs Market"):
-        col1, col2 = st.sidebar.columns(2)
+        col1, col2 = st.columns(2)
 
         with col1:
             week52_high = full_stock_info.get('fiftyTwoWeekHigh')
