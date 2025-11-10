@@ -18,6 +18,7 @@ from src.database import StockDatabase
 from src.data_collector import DataCollector
 from src.analyzer import TechnicalAnalyzer
 from src.news_fetcher import NewsFetcher
+from src.portfolio_manager import PortfolioManager
 
 
 # Page configuration
@@ -36,9 +37,10 @@ def init_components():
     collector = DataCollector()
     analyzer = TechnicalAnalyzer()
     news_fetcher = NewsFetcher()
-    return db, collector, analyzer, news_fetcher
+    portfolio_mgr = PortfolioManager()
+    return db, collector, analyzer, news_fetcher, portfolio_mgr
 
-db, collector, analyzer, news_fetcher = init_components()
+db, collector, analyzer, news_fetcher, portfolio_mgr = init_components()
 
 
 def create_candlestick_chart(df, ticker):
@@ -217,11 +219,40 @@ def display_metrics(ticker, df_with_indicators):
         rsi = latest.get('RSI', 0)
         if pd.notna(rsi):
             rsi_signal = signals.get('rsi_signal', 'Unknown')
-            st.metric(
-                label="RSI",
-                value=f"{rsi:.1f}",
-                delta=rsi_signal
-            )
+
+            # Add visual alert for extreme RSI conditions
+            if rsi <= 20:
+                st.metric(
+                    label="RSI ⚠️ EXTREME OVERSOLD",
+                    value=f"{rsi:.1f}",
+                    delta=rsi_signal,
+                    delta_color="inverse"
+                )
+            elif rsi <= 30:
+                st.metric(
+                    label="RSI 🟢 Oversold",
+                    value=f"{rsi:.1f}",
+                    delta=rsi_signal
+                )
+            elif rsi >= 80:
+                st.metric(
+                    label="RSI ⚠️ EXTREME OVERBOUGHT",
+                    value=f"{rsi:.1f}",
+                    delta=rsi_signal,
+                    delta_color="inverse"
+                )
+            elif rsi >= 70:
+                st.metric(
+                    label="RSI 🔴 Overbought",
+                    value=f"{rsi:.1f}",
+                    delta=rsi_signal
+                )
+            else:
+                st.metric(
+                    label="RSI",
+                    value=f"{rsi:.1f}",
+                    delta=rsi_signal
+                )
     
     with col4:
         macd_signal = signals.get('macd_signal', 'Unknown')
@@ -269,6 +300,110 @@ def display_signals_panel(signals):
         st.warning(f"🟡 Overall Signal: **{overall}** - Mixed signals, wait for clearer trend")
 
 
+def display_signal_conflicts(signals, news_sentiment=None, news_score=None):
+    """Detect and explain conflicts between technical signals and news sentiment"""
+
+    overall_technical = signals.get('overall', 'HOLD')
+    has_conflicts = False
+    conflicts = []
+
+    # Check if we have news sentiment to compare
+    if news_sentiment and news_score is not None:
+        # Technical vs News Conflict
+        if overall_technical == 'BUY' and news_sentiment == 'negative':
+            has_conflicts = True
+            conflicts.append({
+                'type': 'Technical vs News',
+                'severity': 'high',
+                'description': f"Technical signals suggest **BUY** but news sentiment is **NEGATIVE** ({int(news_score*100)}% positive)",
+                'explanation': "The charts show bullish patterns, but recent news is bearish. This could indicate market overreaction to news, or technical indicators haven't caught up to fundamental changes yet.",
+                'recommendation': "⚠️ Proceed with caution. Wait for news sentiment to improve or for more confirmation from technical indicators."
+            })
+        elif overall_technical == 'SELL' and news_sentiment == 'positive':
+            has_conflicts = True
+            conflicts.append({
+                'type': 'Technical vs News',
+                'severity': 'high',
+                'description': f"Technical signals suggest **SELL** but news sentiment is **POSITIVE** ({int(news_score*100)}% positive)",
+                'explanation': "The charts show bearish patterns despite positive news. This could mean the price already ran up on the news, or the market doesn't believe the positive narrative.",
+                'recommendation': "⚠️ Be cautious. Positive news with declining technicals might be a distribution phase. Consider the broader market context."
+            })
+        elif overall_technical == 'HOLD' and news_sentiment in ['positive', 'negative']:
+            conflicts.append({
+                'type': 'Mixed Signals',
+                'severity': 'medium',
+                'description': f"Technical signals are **NEUTRAL** but news is **{news_sentiment.upper()}** ({int(news_score*100)}% positive)",
+                'explanation': "Technical indicators are showing mixed signals while news has a clear sentiment. This often happens during consolidation periods or when the market is digesting information.",
+                'recommendation': "💡 Wait for technical confirmation before acting on news sentiment. Look for a clear breakout or breakdown."
+            })
+
+    # Internal Technical Conflicts
+    trend = signals.get('trend', 'Unknown')
+    rsi_signal = signals.get('rsi_signal', 'Unknown')
+    macd_signal = signals.get('macd_signal', 'Unknown')
+
+    # RSI vs Trend Conflict
+    if 'Uptrend' in trend and rsi_signal == 'Overbought':
+        conflicts.append({
+            'type': 'RSI vs Trend',
+            'severity': 'medium',
+            'description': "**Uptrend** continues but RSI shows **Overbought**",
+            'explanation': "The stock is in an uptrend but may be due for a pullback. Strong trends can stay overbought for extended periods.",
+            'recommendation': "💡 Consider taking partial profits or waiting for a pullback to add positions. Use trailing stop losses."
+        })
+    elif 'Downtrend' in trend and rsi_signal == 'Oversold':
+        has_conflicts = True
+        conflicts.append({
+            'type': 'RSI vs Trend',
+            'severity': 'medium',
+            'description': "**Downtrend** continues but RSI shows **Oversold**",
+            'explanation': "The stock is in a downtrend but may be oversold. This could be a bounce opportunity, but the trend is still down.",
+            'recommendation': "💡 Possible short-term bounce, but risky. Wait for trend reversal confirmation before going long. Consider this for swing trading only."
+        })
+
+    # MACD vs RSI Conflict
+    if macd_signal == 'Bullish' and rsi_signal == 'Overbought':
+        conflicts.append({
+            'type': 'MACD vs RSI',
+            'severity': 'low',
+            'description': "**MACD is Bullish** but **RSI is Overbought**",
+            'explanation': "MACD shows momentum is building, but RSI warns of potential overextension. This is common in strong rallies.",
+            'recommendation': "💡 Momentum is strong but watch for exhaustion. Look for divergence or MACD crossover as exit signal."
+        })
+    elif macd_signal == 'Bearish' and rsi_signal == 'Oversold':
+        conflicts.append({
+            'type': 'MACD vs RSI',
+            'severity': 'low',
+            'description': "**MACD is Bearish** but **RSI is Oversold**",
+            'explanation': "MACD shows downward momentum, but RSI suggests the selloff may be overdone. Potential for a relief rally.",
+            'recommendation': "💡 Watch for MACD bullish crossover combined with RSI recovery as a potential reversal signal."
+        })
+
+    # Display conflicts if any exist
+    if conflicts:
+        st.subheader("⚠️ Signal Conflicts & Analysis")
+
+        for i, conflict in enumerate(conflicts):
+            severity_color = {
+                'high': '🔴',
+                'medium': '🟡',
+                'low': '🔵'
+            }.get(conflict['severity'], '⚪')
+
+            with st.expander(f"{severity_color} {conflict['type']}: {conflict['description']}", expanded=(i==0 and conflict['severity']=='high')):
+                st.write(f"**What's Happening:**")
+                st.write(conflict['explanation'])
+                st.write("")
+                st.write(f"**What To Do:**")
+                st.write(conflict['recommendation'])
+
+        return True  # Conflicts exist
+    else:
+        # No conflicts - all signals align
+        st.success("✅ **All Signals Aligned** - Technical indicators and news sentiment are in agreement")
+        return False  # No conflicts
+
+
 def display_news_and_sentiment(ticker):
     """Display recent news and sentiment analysis"""
     st.subheader("📰 Recent News & Market Sentiment")
@@ -280,7 +415,7 @@ def display_news_and_sentiment(ticker):
         st.info(f"📰 No recent news available for {ticker} from Yahoo Finance.")
         st.caption("News availability varies by stock. Try a major stock like AAPL, TSLA, or MSFT.")
         st.caption("Check your terminal/console for debug information.")
-        return
+        return None, None  # Return None for sentiment data
 
     # Calculate overall sentiment
     overall_sentiment, sentiment_score = news_fetcher.get_overall_sentiment(articles)
@@ -346,6 +481,9 @@ def display_news_and_sentiment(ticker):
         if i < len(articles):
             st.markdown("")
 
+    # Return sentiment data for conflict detection
+    return overall_sentiment, sentiment_score
+
 
 def main():
     """Main dashboard function"""
@@ -382,8 +520,8 @@ def main():
     # Time range selector
     time_range = st.sidebar.selectbox(
         "Time Range",
-        options=['1mo', '3mo', '6mo', '1y', '2y', 'All'],
-        index=2
+        options=['1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', 'All'],
+        index=4  # Default to 6mo
     )
     
     # Update button
@@ -401,7 +539,7 @@ def main():
             st.rerun()
     
     st.sidebar.markdown("---")
-    
+
     # Stock info
     stock_info = db.get_stock_info(selected_ticker)
     if stock_info:
@@ -409,7 +547,74 @@ def main():
         st.sidebar.write(f"**{stock_info.get('company_name', selected_ticker)}**")
         st.sidebar.write(f"Sector: {stock_info.get('sector', 'N/A')}")
         st.sidebar.write(f"Industry: {stock_info.get('industry', 'N/A')}")
-    
+
+    st.sidebar.markdown("---")
+
+    # Portfolio Management
+    st.sidebar.subheader("📁 My Watchlists")
+
+    # Get existing watchlists
+    watchlists = portfolio_mgr.get_watchlists()
+
+    if watchlists:
+        watchlist_names = list(watchlists.keys())
+        selected_watchlist = st.sidebar.selectbox(
+            "Select Watchlist",
+            options=['Default'] + watchlist_names,
+            index=0
+        )
+
+        if selected_watchlist != 'Default':
+            # Show watchlist tickers
+            wl_tickers = portfolio_mgr.get_watchlist_tickers(selected_watchlist)
+            if wl_tickers:
+                st.sidebar.write(f"**Stocks ({len(wl_tickers)}):**")
+                st.sidebar.write(", ".join(wl_tickers))
+
+                # Remove from watchlist
+                ticker_to_remove = st.sidebar.selectbox(
+                    "Remove stock",
+                    options=wl_tickers,
+                    key="remove_ticker"
+                )
+                if st.sidebar.button(f"🗑️ Remove {ticker_to_remove}"):
+                    success, msg = portfolio_mgr.remove_from_watchlist(selected_watchlist, ticker_to_remove)
+                    if success:
+                        st.sidebar.success(msg)
+                        st.rerun()
+                    else:
+                        st.sidebar.error(msg)
+
+    # Create new watchlist
+    with st.sidebar.expander("➕ Create New Watchlist"):
+        new_wl_name = st.text_input("Watchlist Name", key="new_watchlist")
+        if st.button("Create"):
+            if new_wl_name:
+                success, msg = portfolio_mgr.create_watchlist(new_wl_name)
+                if success:
+                    st.success(msg)
+                    st.rerun()
+                else:
+                    st.error(msg)
+            else:
+                st.error("Please enter a watchlist name")
+
+    # Add current stock to watchlist
+    if watchlists:
+        with st.sidebar.expander(f"➕ Add {selected_ticker} to Watchlist"):
+            target_watchlist = st.selectbox(
+                "Select watchlist",
+                options=list(watchlists.keys()),
+                key="add_to_watchlist"
+            )
+            if st.button(f"Add {selected_ticker}"):
+                success, msg = portfolio_mgr.add_to_watchlist(target_watchlist, selected_ticker)
+                if success:
+                    st.success(msg)
+                    st.rerun()
+                else:
+                    st.error(msg)
+
     # Get stock data
     df = db.get_stock_data(selected_ticker)
     
@@ -420,7 +625,11 @@ def main():
     # Filter by time range
     if time_range != 'All':
         end_date = datetime.now()
-        if time_range == '1mo':
+        if time_range == '1d':
+            start_date = end_date - timedelta(days=1)
+        elif time_range == '5d':
+            start_date = end_date - timedelta(days=5)
+        elif time_range == '1mo':
             start_date = end_date - timedelta(days=30)
         elif time_range == '3mo':
             start_date = end_date - timedelta(days=90)
@@ -430,7 +639,9 @@ def main():
             start_date = end_date - timedelta(days=365)
         elif time_range == '2y':
             start_date = end_date - timedelta(days=730)
-        
+        elif time_range == '5y':
+            start_date = end_date - timedelta(days=1825)
+
         df = df[df.index >= start_date]
     
     # Calculate indicators
@@ -459,8 +670,13 @@ def main():
 
     st.markdown("---")
 
-    # Display news and sentiment
-    display_news_and_sentiment(selected_ticker)
+    # Display news and sentiment (get sentiment data back)
+    news_sentiment, news_score = display_news_and_sentiment(selected_ticker)
+
+    st.markdown("---")
+
+    # Display signal conflicts and analysis
+    display_signal_conflicts(signals, news_sentiment, news_score)
 
     st.markdown("---")
 
