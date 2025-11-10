@@ -406,9 +406,9 @@ def display_signal_conflicts(signals, news_sentiment=None, news_score=None):
 
 def display_news_and_sentiment(ticker):
     """Display recent news and sentiment analysis"""
-    st.subheader("📰 Recent News & Market Sentiment")
+    st.subheader(f"📰 Recent News & Market Sentiment for {ticker}")
 
-    with st.spinner("Fetching latest news..."):
+    with st.spinner(f"Fetching latest news for {ticker}..."):
         articles = news_fetcher.fetch_news(ticker, max_articles=8)
 
     if not articles:
