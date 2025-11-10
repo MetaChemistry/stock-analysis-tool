@@ -540,13 +540,269 @@ def main():
     
     st.sidebar.markdown("---")
 
-    # Stock info
+    # Stock info - fetch full info from yfinance for detailed metrics
+    import yfinance as yf
+    stock = yf.Ticker(selected_ticker)
+    try:
+        full_stock_info = stock.info
+    except:
+        full_stock_info = {}
+
     stock_info = db.get_stock_info(selected_ticker)
-    if stock_info:
-        st.sidebar.subheader("ℹ️ Company Info")
-        st.sidebar.write(f"**{stock_info.get('company_name', selected_ticker)}**")
-        st.sidebar.write(f"Sector: {stock_info.get('sector', 'N/A')}")
-        st.sidebar.write(f"Industry: {stock_info.get('industry', 'N/A')}")
+
+    # Basic Company Info (always visible)
+    st.sidebar.subheader("ℹ️ Company Info")
+    company_name = full_stock_info.get('longName') or (stock_info.get('company_name') if stock_info else selected_ticker)
+    st.sidebar.write(f"**{company_name}**")
+
+    sector = full_stock_info.get('sector') or (stock_info.get('sector') if stock_info else 'N/A')
+    industry = full_stock_info.get('industry') or (stock_info.get('industry') if stock_info else 'N/A')
+    st.sidebar.write(f"Sector: {sector}")
+    st.sidebar.write(f"Industry: {industry}")
+
+    # Enhanced Financial Metrics (collapsible)
+
+    # Section 1: Valuation Metrics
+    with st.sidebar.expander("💰 Valuation Metrics"):
+        col1, col2 = st.sidebar.columns(2)
+
+        with col1:
+            pe_ratio = full_stock_info.get('trailingPE')
+            if pe_ratio:
+                st.metric("P/E Ratio", f"{pe_ratio:.2f}")
+                if pe_ratio < 15:
+                    st.caption("✅ Below market avg")
+                elif pe_ratio > 30:
+                    st.caption("⚠️ Premium valuation")
+            else:
+                st.metric("P/E Ratio", "N/A")
+
+            pb_ratio = full_stock_info.get('priceToBook')
+            if pb_ratio:
+                st.metric("Price/Book", f"{pb_ratio:.2f}")
+            else:
+                st.metric("Price/Book", "N/A")
+
+        with col2:
+            peg_ratio = full_stock_info.get('pegRatio')
+            if peg_ratio:
+                st.metric("PEG Ratio", f"{peg_ratio:.2f}")
+                if peg_ratio < 1.0:
+                    st.caption("🔥 Undervalued")
+                elif peg_ratio > 2.0:
+                    st.caption("⚠️ Overvalued")
+                else:
+                    st.caption("✅ Fair value")
+            else:
+                st.metric("PEG Ratio", "N/A")
+
+            ev_ebitda = full_stock_info.get('enterpriseToEbitda')
+            if ev_ebitda:
+                st.metric("EV/EBITDA", f"{ev_ebitda:.2f}")
+            else:
+                st.metric("EV/EBITDA", "N/A")
+
+        # Market Cap with size category
+        market_cap = full_stock_info.get('marketCap')
+        if market_cap:
+            market_cap_b = market_cap / 1e9
+            if market_cap_b >= 200:
+                size = "Mega Cap"
+                icon = "🏢"
+            elif market_cap_b >= 10:
+                size = "Large Cap"
+                icon = "🏛️"
+            elif market_cap_b >= 2:
+                size = "Mid Cap"
+                icon = "🏪"
+            else:
+                size = "Small Cap"
+                icon = "🏠"
+            st.write(f"{icon} **Market Cap:** ${market_cap_b:.2f}B ({size})")
+        else:
+            st.write("Market Cap: N/A")
+
+    # Section 2: Profitability
+    with st.sidebar.expander("📈 Profitability"):
+        col1, col2 = st.sidebar.columns(2)
+
+        with col1:
+            profit_margin = full_stock_info.get('profitMargins')
+            if profit_margin:
+                margin_pct = profit_margin * 100
+                st.metric("Profit Margin", f"{margin_pct:.1f}%")
+                if margin_pct > 20:
+                    st.caption("🔥 Excellent")
+                elif margin_pct > 10:
+                    st.caption("✅ Good")
+                elif margin_pct < 0:
+                    st.caption("⚠️ Negative")
+            else:
+                st.metric("Profit Margin", "N/A")
+
+            operating_margin = full_stock_info.get('operatingMargins')
+            if operating_margin:
+                st.metric("Operating Margin", f"{operating_margin * 100:.1f}%")
+            else:
+                st.metric("Operating Margin", "N/A")
+
+        with col2:
+            roe = full_stock_info.get('returnOnEquity')
+            if roe:
+                roe_pct = roe * 100
+                st.metric("ROE", f"{roe_pct:.1f}%")
+                if roe_pct > 15:
+                    st.caption("🔥 Strong")
+                elif roe_pct > 10:
+                    st.caption("✅ Good")
+                else:
+                    st.caption("Fair")
+            else:
+                st.metric("ROE", "N/A")
+
+            roa = full_stock_info.get('returnOnAssets')
+            if roa:
+                st.metric("ROA", f"{roa * 100:.1f}%")
+            else:
+                st.metric("ROA", "N/A")
+
+    # Section 3: Financial Health
+    with st.sidebar.expander("🏦 Financial Health"):
+        col1, col2 = st.sidebar.columns(2)
+
+        with col1:
+            debt_to_equity = full_stock_info.get('debtToEquity')
+            if debt_to_equity:
+                st.metric("Debt/Equity", f"{debt_to_equity / 100:.2f}")
+                if debt_to_equity / 100 > 2.0:
+                    st.caption("⚠️ High leverage")
+                elif debt_to_equity / 100 < 0.5:
+                    st.caption("✅ Conservative")
+                else:
+                    st.caption("Moderate")
+            else:
+                st.metric("Debt/Equity", "N/A")
+
+            current_ratio = full_stock_info.get('currentRatio')
+            if current_ratio:
+                st.metric("Current Ratio", f"{current_ratio:.2f}")
+                if current_ratio < 1.0:
+                    st.caption("⚠️ Liquidity concern")
+                elif current_ratio > 2.0:
+                    st.caption("✅ Strong liquidity")
+                else:
+                    st.caption("✅ Adequate")
+            else:
+                st.metric("Current Ratio", "N/A")
+
+        with col2:
+            total_cash = full_stock_info.get('totalCash')
+            if total_cash:
+                cash_b = total_cash / 1e9
+                st.metric("Total Cash", f"${cash_b:.2f}B")
+            else:
+                st.metric("Total Cash", "N/A")
+
+            quick_ratio = full_stock_info.get('quickRatio')
+            if quick_ratio:
+                st.metric("Quick Ratio", f"{quick_ratio:.2f}")
+                if quick_ratio < 1.0:
+                    st.caption("⚠️ Below 1.0")
+                else:
+                    st.caption("✅ Healthy")
+            else:
+                st.metric("Quick Ratio", "N/A")
+
+    # Section 4: Shareholder Returns
+    with st.sidebar.expander("💵 Shareholder Returns"):
+        col1, col2 = st.sidebar.columns(2)
+
+        with col1:
+            div_yield = full_stock_info.get('dividendYield')
+            if div_yield and div_yield > 0:
+                st.metric("Dividend Yield", f"{div_yield * 100:.2f}%")
+                if div_yield * 100 > 4:
+                    st.caption("🔥 High yield")
+                elif div_yield * 100 > 2:
+                    st.caption("✅ Good yield")
+            else:
+                st.metric("Dividend Yield", "N/A")
+                st.caption("No dividend")
+
+            payout_ratio = full_stock_info.get('payoutRatio')
+            if payout_ratio and payout_ratio > 0:
+                st.metric("Payout Ratio", f"{payout_ratio * 100:.1f}%")
+                if payout_ratio > 0.8:
+                    st.caption("⚠️ High payout")
+                elif payout_ratio < 0.5:
+                    st.caption("✅ Sustainable")
+            else:
+                st.metric("Payout Ratio", "N/A")
+
+        with col2:
+            div_rate = full_stock_info.get('dividendRate')
+            if div_rate:
+                st.metric("Annual Dividend", f"${div_rate:.2f}")
+            else:
+                st.metric("Annual Dividend", "N/A")
+
+            trailing_eps = full_stock_info.get('trailingEps')
+            if trailing_eps:
+                st.metric("EPS (TTM)", f"${trailing_eps:.2f}")
+            else:
+                st.metric("EPS (TTM)", "N/A")
+
+    # Section 5: Performance vs Market
+    with st.sidebar.expander("📊 Performance vs Market"):
+        col1, col2 = st.sidebar.columns(2)
+
+        with col1:
+            week52_high = full_stock_info.get('fiftyTwoWeekHigh')
+            week52_low = full_stock_info.get('fiftyTwoWeekLow')
+            current_price = full_stock_info.get('currentPrice') or full_stock_info.get('regularMarketPrice')
+
+            if week52_high:
+                st.metric("52-Week High", f"${week52_high:.2f}")
+            else:
+                st.metric("52-Week High", "N/A")
+
+            if week52_low:
+                st.metric("52-Week Low", f"${week52_low:.2f}")
+            else:
+                st.metric("52-Week Low", "N/A")
+
+            # Calculate position in 52-week range
+            if week52_high and week52_low and current_price:
+                range_position = ((current_price - week52_low) / (week52_high - week52_low)) * 100
+                st.write(f"**Range Position:** {range_position:.1f}%")
+                if range_position > 80:
+                    st.caption("🔥 Near highs")
+                elif range_position < 20:
+                    st.caption("⚠️ Near lows")
+
+        with col2:
+            beta = full_stock_info.get('beta')
+            if beta:
+                st.metric("Beta (Volatility)", f"{beta:.2f}")
+                if beta > 1.5:
+                    st.caption("⚠️ High volatility")
+                elif beta < 0.8:
+                    st.caption("✅ Low volatility")
+                else:
+                    st.caption("Market-like")
+            else:
+                st.metric("Beta", "N/A")
+
+            # 52 week change
+            week52_change = full_stock_info.get('52WeekChange')
+            if week52_change:
+                st.metric("52-Week Return", f"{week52_change * 100:.1f}%")
+                if week52_change > 0.3:
+                    st.caption("🔥 Strong performer")
+                elif week52_change < -0.2:
+                    st.caption("⚠️ Underperformer")
+            else:
+                st.metric("52-Week Return", "N/A")
 
     st.sidebar.markdown("---")
 
