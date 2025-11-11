@@ -547,6 +547,13 @@ def main():
     if 'selected_ticker' not in st.session_state:
         st.session_state.selected_ticker = available_tickers[0] if available_tickers else None
 
+    # Auto-select first result when searching
+    if search_query and filtered_tickers:
+        # If we're actively searching and the first filtered result is different from current selection
+        # automatically select it
+        if st.session_state.selected_ticker != filtered_tickers[0]:
+            st.session_state.selected_ticker = filtered_tickers[0]
+
     # Display filtered results as buttons
     if filtered_tickers:
         # Show results (limit to 10 for better UX)
