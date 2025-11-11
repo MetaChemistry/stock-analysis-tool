@@ -527,9 +527,14 @@ def main():
     st.sidebar.subheader("🔍 Stock Search")
 
     # Search input
+    # Initialize search query state
+    if 'search_query' not in st.session_state:
+        st.session_state.search_query = ""
+
     search_query = st.sidebar.text_input(
         "Search by ticker or company name",
         placeholder="e.g., AAPL or Apple",
+        value=st.session_state.search_query,
         key="stock_search"
     )
 
@@ -547,12 +552,14 @@ def main():
     if 'selected_ticker' not in st.session_state:
         st.session_state.selected_ticker = available_tickers[0] if available_tickers else None
 
-    # Auto-select first result when searching
+    # Auto-select first result when searching and clear search box
     if search_query and filtered_tickers:
         # If we're actively searching and the first filtered result is different from current selection
-        # automatically select it
+        # automatically select it and clear the search
         if st.session_state.selected_ticker != filtered_tickers[0]:
             st.session_state.selected_ticker = filtered_tickers[0]
+            st.session_state.search_query = ""  # Clear search after selection
+            st.rerun()
 
     # Display filtered results as buttons
     if filtered_tickers:
