@@ -20,6 +20,19 @@ from src.analyzer import TechnicalAnalyzer
 from src.news_fetcher import NewsFetcher
 from src.portfolio_manager import PortfolioManager
 
+# Import stock name mapping for search
+try:
+    from stock_names import get_stock_display_name, search_stocks
+except ImportError:
+    # Fallback if stock_names.py doesn't exist
+    def get_stock_display_name(ticker):
+        return ticker
+    def search_stocks(query, available_tickers):
+        if not query:
+            return available_tickers
+        query = query.upper()
+        return [t for t in available_tickers if query in t.upper()]
+
 
 # Page configuration
 st.set_page_config(
@@ -510,12 +523,56 @@ def main():
         st.info("💡 Or run: `python src/data_collector.py` from terminal")
         return
     
-    # Stock selector
-    selected_ticker = st.sidebar.selectbox(
-        "Select Stock",
-        options=available_tickers,
-        index=0
+    # Stock search and selector
+    st.sidebar.subheader("🔍 Stock Search")
+
+    # Search input
+    search_query = st.sidebar.text_input(
+        "Search by ticker or company name",
+        placeholder="e.g., AAPL or Apple",
+        key="stock_search"
     )
+
+    # Filter tickers based on search
+    if search_query:
+        filtered_tickers = search_stocks(search_query, available_tickers)
+    else:
+        filtered_tickers = available_tickers
+
+    # Show search results count
+    if search_query:
+        st.sidebar.caption(f"Found {len(filtered_tickers)} matches")
+
+    # Display filtered results as buttons
+    if filtered_tickers:
+        # Use session state to track selected ticker
+        if 'selected_ticker' not in st.session_state:
+            st.session_state.selected_ticker = filtered_tickers[0]
+
+        # Show results (limit to 10 for better UX)
+        display_limit = min(10, len(filtered_tickers))
+        st.sidebar.write("**Results:**")
+
+        for ticker in filtered_tickers[:display_limit]:
+            display_name = get_stock_display_name(ticker)
+            # Highlight if currently selected
+            if ticker == st.session_state.selected_ticker:
+                if st.sidebar.button(f"✓ {display_name}", key=f"btn_{ticker}", use_container_width=True):
+                    st.session_state.selected_ticker = ticker
+                    st.rerun()
+            else:
+                if st.sidebar.button(display_name, key=f"btn_{ticker}", use_container_width=True):
+                    st.session_state.selected_ticker = ticker
+                    st.rerun()
+
+        if len(filtered_tickers) > display_limit:
+            st.sidebar.caption(f"...and {len(filtered_tickers) - display_limit} more. Refine your search.")
+
+        selected_ticker = st.session_state.selected_ticker
+    else:
+        st.sidebar.warning("No matches found. Try a different search.")
+        selected_ticker = available_tickers[0] if available_tickers else None
+        st.session_state.selected_ticker = selected_ticker
     
     # Time range selector
     time_range = st.sidebar.selectbox(
