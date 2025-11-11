@@ -543,12 +543,12 @@ def main():
     if search_query:
         st.sidebar.caption(f"Found {len(filtered_tickers)} matches")
 
+    # Initialize session state for selected ticker
+    if 'selected_ticker' not in st.session_state:
+        st.session_state.selected_ticker = available_tickers[0] if available_tickers else None
+
     # Display filtered results as buttons
     if filtered_tickers:
-        # Use session state to track selected ticker
-        if 'selected_ticker' not in st.session_state:
-            st.session_state.selected_ticker = filtered_tickers[0]
-
         # Show results (limit to 10 for better UX)
         display_limit = min(10, len(filtered_tickers))
         st.sidebar.write("**Results:**")
@@ -557,9 +557,9 @@ def main():
             display_name = get_stock_display_name(ticker)
             # Highlight if currently selected
             if ticker == st.session_state.selected_ticker:
-                if st.sidebar.button(f"✓ {display_name}", key=f"btn_{ticker}", use_container_width=True):
-                    st.session_state.selected_ticker = ticker
-                    st.rerun()
+                if st.sidebar.button(f"✓ {display_name}", key=f"btn_{ticker}", use_container_width=True, type="primary"):
+                    # Already selected, no need to rerun
+                    pass
             else:
                 if st.sidebar.button(display_name, key=f"btn_{ticker}", use_container_width=True):
                     st.session_state.selected_ticker = ticker
@@ -567,12 +567,11 @@ def main():
 
         if len(filtered_tickers) > display_limit:
             st.sidebar.caption(f"...and {len(filtered_tickers) - display_limit} more. Refine your search.")
-
-        selected_ticker = st.session_state.selected_ticker
     else:
         st.sidebar.warning("No matches found. Try a different search.")
-        selected_ticker = available_tickers[0] if available_tickers else None
-        st.session_state.selected_ticker = selected_ticker
+
+    # Always use the ticker from session state
+    selected_ticker = st.session_state.selected_ticker
     
     # Time range selector
     time_range = st.sidebar.selectbox(
