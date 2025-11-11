@@ -3,17 +3,32 @@ Stock Analysis Tool - Configuration File
 All customizable settings are centralized here.
 """
 
-# Stock Watchlist - Add or remove stocks as needed
-WATCHLIST = [
-    'AAPL',  # Apple Inc.
-    'MSFT',  # Microsoft Corporation
-    'GOOGL', # Alphabet Inc.
-    'AMZN',  # Amazon.com Inc.
-    'TSLA',  # Tesla Inc.
-    'NVDA',  # NVIDIA Corporation
-    'META',  # Meta Platforms Inc.
-    'SPY',   # S&P 500 ETF
-]
+# Import S&P 500 tickers
+# --------------------------------------------------------------------------------
+# WATCHLIST OPTIONS:
+# 1. TOP_100_TICKERS   - Top 100 stocks by market cap (RECOMMENDED - faster)
+# 2. SP500_TICKERS     - All 500+ S&P 500 stocks (slower data collection)
+# 3. Custom list       - Create your own list below
+# --------------------------------------------------------------------------------
+try:
+    from sp500_tickers import SP500_TICKERS, TOP_100_TICKERS
+
+    # Choose your watchlist (uncomment one):
+    WATCHLIST = TOP_100_TICKERS        # ← RECOMMENDED: Fastest, covers major stocks
+    # WATCHLIST = SP500_TICKERS        # ← ALL S&P 500 stocks (takes longer to collect data)
+
+except ImportError:
+    # Fallback to manual list if sp500_tickers.py not found
+    WATCHLIST = [
+        'AAPL',  # Apple Inc.
+        'MSFT',  # Microsoft Corporation
+        'GOOGL', # Alphabet Inc.
+        'AMZN',  # Amazon.com Inc.
+        'TSLA',  # Tesla Inc.
+        'NVDA',  # NVIDIA Corporation
+        'META',  # Meta Platforms Inc.
+        'SPY',   # S&P 500 ETF
+    ]
 
 # Data Collection Settings
 DATA_PERIOD = '2y'        # How much historical data to fetch (1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max)
