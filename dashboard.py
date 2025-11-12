@@ -526,16 +526,14 @@ def main():
     # Stock search and selector
     st.sidebar.subheader("🔍 Stock Search")
 
-    # Search input
-    # Initialize search query state
-    if 'search_query' not in st.session_state:
-        st.session_state.search_query = ""
+    # Search input - use counter to reset the input field
+    if 'search_counter' not in st.session_state:
+        st.session_state.search_counter = 0
 
     search_query = st.sidebar.text_input(
         "Search by ticker or company name",
         placeholder="e.g., AAPL or Apple",
-        value=st.session_state.search_query,
-        key="stock_search"
+        key=f"stock_search_{st.session_state.search_counter}"
     )
 
     # Filter tickers based on search
@@ -558,7 +556,7 @@ def main():
         # automatically select it and clear the search
         if st.session_state.selected_ticker != filtered_tickers[0]:
             st.session_state.selected_ticker = filtered_tickers[0]
-            st.session_state.search_query = ""  # Clear search after selection
+            st.session_state.search_counter += 1  # Increment counter to reset text input
             st.rerun()
 
     # Display filtered results as buttons
